@@ -12,6 +12,11 @@ def generate_launch_description():
     pkg_share = FindPackageShare('gazebo_controller').find('gazebo_controller')    
     bridge_name = LaunchConfiguration('bridge_name')
     config_file = LaunchConfiguration('config_file')
+    urdf_file = os.path.join(pkg_share, 'launch', 'building_robot.urdf')
+    rviz_file = os.path.join(pkg_share, 'launch', 'building_robot.rviz')
+    with open(urdf_file, 'r') as infp:
+        robot_desc = infp.read()
+    rsp_params = {'robot_description': robot_desc} 
 
     declare_bridge_name_cmd = DeclareLaunchArgument(
         'bridge_name', default_value='ros_gz_bridge', description='Name of ros_gz_bridge node'
@@ -31,6 +36,8 @@ def generate_launch_description():
 
     # Create the launch description and populate
     ld = LaunchDescription([
+        Node(package='robot_state_publisher', executable='robot_state_publisher',
+             output='screen', parameters=[rsp_params, {'use_sim_time': True}]),       
         declare_bridge_name_cmd,
         declare_config_file_cmd,
         gazebo,
@@ -39,7 +46,7 @@ def generate_launch_description():
             config_file=LaunchConfiguration('config_file'),
             
         ),
-        Node(package='rviz2', executable='rviz2', output='screen', parameters=[{'use_sim_time': True}]),
+        Node(package='rviz2', executable='rviz2', output='screen', parameters=[{'use_sim_time': True}], arguments=['-d', rviz_file]),
     ])
 
     return ld
