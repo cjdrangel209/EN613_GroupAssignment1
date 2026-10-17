@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<robot name="basic_robot">
+<robot name="vehicle_blue">
   <material name="red">
     <color rgba="0.8 0 0 1"/>
   </material>
@@ -12,59 +12,66 @@
     <color rgba="0 0 0.8 1"/>
   </material>
 
+  <link name="base_link"/>
+
+  <joint name="base_link_to_chassis" type="fixed">
+    <parent link="base_link"/>
+    <child link="chassis"/>
+    <origin rpy="0 0 0" xyz="0.5 0 0.4"/>
+  </joint>
+
   <link name="chassis">
     <visual>
       <geometry>
-        <box size="0.825 0.825 0.075"/>
+        <box size="2.0 1.0 0.5"/>
       </geometry>
+      <material name="blue"/>
     </visual>
   </link>
 
   <link name="left_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.05" radius="0.4"/>
+        <cylinder length="0.2" radius="0.4"/>
       </geometry>
-      <material name="blue"/>      
+      <material name="red"/>      
     </visual>
   </link>
 
-  <joint name="chassis_to_left_wheel" type="continuous">
+  <joint name="chassis_to_left_wheel" type="fixed">
     <parent link="chassis"/>
     <child link="left_wheel"/>
-    <origin rpy="1.57075 0 0" xyz="0 0.4375 0"/>
-    <axis xyz="0 0 1"/>
+    <origin rpy="1.57075 0 0" xyz="-0.5 0.6 0"/>
   </joint>
 
   <link name="right_wheel">
     <visual>
       <geometry>
-        <cylinder length="0.05" radius="0.4"/>
+        <cylinder length="0.2" radius="0.4"/>
       </geometry>
       <material name="red"/>  
     </visual>
   </link>
 
-  <joint name="chassis_to_right_wheel" type="continuous">
+  <joint name="chassis_to_right_wheel" type="fixed">
     <parent link="chassis"/>
     <child link="right_wheel"/>
-    <origin rpy="1.57075 0 0" xyz="0 -0.4375 0"/>
-    <axis xyz="0 0 1"/>
+    <origin rpy="1.57075 0 0" xyz="-0.5 -0.6 0"/>
   </joint>
 
-  <link name="lidar_dome">
+  <link name="caster">
     <visual>
       <geometry>
-        <sphere radius="0.03125"/>
+        <sphere radius="0.2"/>
       </geometry>
       <material name="green"/> 
     </visual>
   </link>
 
-  <joint name="chassis_to_lidar_dome" type="fixed">
+  <joint name="chassis_to_caster" type="fixed">
     <parent link="chassis"/>
-    <child link="lidar_dome"/>
-    <origin rpy="0 0 0" xyz="0.3 0 0.0375"/>
+    <child link="caster"/>
+    <origin rpy="0 0 0" xyz="0.8 0 -0.2"/>
   </joint>
 
 </robot>
