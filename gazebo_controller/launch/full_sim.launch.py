@@ -6,6 +6,7 @@ from launch_ros.substitutions import FindPackageShare
 import os
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.actions import Node
 
 def generate_launch_description():
     pkg_share = FindPackageShare('gazebo_controller').find('gazebo_controller')    
@@ -36,7 +37,9 @@ def generate_launch_description():
         RosGzBridge(
             bridge_name=LaunchConfiguration('bridge_name'),
             config_file=LaunchConfiguration('config_file'),
+            
         ),
+        Node(package='rviz2', executable='rviz2', output='screen', parameters=[{'use_sim_time': True}]),
     ])
 
     return ld
