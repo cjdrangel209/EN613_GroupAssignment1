@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<robot name="vehicle_blue">
+  <!-- Visual-only ROS description matching the Gazebo SDF robot. Gazebo remains
+       responsible for physics; odom->chassis comes from the Gazebo DiffDrive plugin. -->
+  <link name="chassis">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><box size="2.0 1.0 0.5"/></geometry>
+      <material name="blue"><color rgba="0.0 0.0 1.0 1.0"/></material>
+    </visual>
+  </link>
+  <link name="left_wheel">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.4" length="0.2"/></geometry>
+      <material name="red"><color rgba="1.0 0.0 0.0 1.0"/></material>
+    </visual>
+  </link>
+  <joint name="left_wheel_visual_joint" type="fixed">
+    <parent link="chassis"/><child link="left_wheel"/>
+    <origin xyz="-0.5 0.6 0" rpy="1.5707 0 0"/>
+  </joint>
+  <link name="right_wheel">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.4" length="0.2"/></geometry>
+      <material name="red_right"><color rgba="1.0 0.0 0.0 1.0"/></material>
+    </visual>
+  </link>
+  <joint name="right_wheel_visual_joint" type="fixed">
+    <parent link="chassis"/><child link="right_wheel"/>
+    <origin xyz="-0.5 -0.6 0" rpy="1.5707 0 0"/>
+  </joint>
+  <link name="caster">
+    <visual>
+      <geometry><sphere radius="0.2"/></geometry>
+      <material name="green"><color rgba="0.0 1.0 0.0 1.0"/></material>
+    </visual>
+  </link>
+  <joint name="caster_visual_joint" type="fixed">
+    <parent link="chassis"/><child link="caster"/>
+    <origin xyz="0.8 0 -0.2" rpy="0 0 0"/>
+  </joint>
+</robot>
