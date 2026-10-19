@@ -34,22 +34,35 @@ class DiffDrivePID(Node):
             Marker, '/robot_visualization', 10
         )
 
-        # Controller parameters
-        self.Kp = 0.8       # Proportional gain
-        self.Kd = 0.05      # Derivative gain
-        self.l = 0.4        # Look-ahead point distance along heading
-        self.goal_tolerance = 0.15  # Stop within 15 cm of target
+        # Controller parameters (override with --ros-args -p name:=value)
+        self.declare_parameter('kp', 1.5)               # Proportional gain
+        self.declare_parameter('kd', 0.3)               # Derivative gain
+        self.declare_parameter('offset', 0.3)           # Look-ahead point distance along heading
+        self.declare_parameter('max_linear', 1.0)       # m/s
+        self.declare_parameter('max_angular', 1.5)      # rad/s
+        self.declare_parameter('goal_tolerance', 0.085) # Stop when look-ahead point is this close
 
-        # Previous position for derivative calculation
-        self.prev_x = None
-        self.prev_y = None
+        self.Kp = self.get_parameter('kp').value
+        self.Kd = self.get_parameter('kd').value
+        self.l = self.get_parameter('offset').value
+        self.v_max = self.get_parameter('max_linear').value
+        self.w_max = self.get_parameter('max_angular').value
+        self.goal_tolerance = self.get_parameter('goal_tolerance').value
+
+        # Latest robot state and velocity estimate (from tf timestamps)
+        self.x = self.y = self.theta = 0.0
+        self.x_dot = self.y_dot = self.theta_dot = 0.0
+        self.prev_stamp_ns = None
 
         self.goal_pose = None
 
         # Control loop at 30 Hz
         self.dt = 1.0 / 30.0
         self.timer = self.create_timer(self.dt, self.update_robot_state)
-        self.get_logger().info('DiffDrive PID Controller ready. Send a 2D Goal Pose in RViz.')
+        self.get_logger().info(
+            f'DiffDrive PID Controller ready: kp={self.Kp}, kd={self.Kd}, l={self.l} m, '
+            f'|v|<={self.v_max} m/s, |w|<={self.w_max} rad/s, tol={self.goal_tolerance} m. '
+            'Send a 2D Goal Pose in RViz.')
 
     def quaternion_to_euler(self, q):
         """Convert a ROS quaternion to roll, pitch, and yaw angles."""
@@ -81,6 +94,24 @@ class DiffDrivePID(Node):
             self.publish_robot_marker(trans.transform)
         except TransformException as ex:
             return
+
+        # Estimate robot velocity from the transform's own timestamps, so a
+        # repeated (not yet updated) transform doesn't produce zero/spiky rates.
+        stamp_ns = rclpy.time.Time.from_msg(trans.header.stamp).nanoseconds
+        if self.prev_stamp_ns is not None and stamp_ns > self.prev_stamp_ns:
+            dt = (stamp_ns - self.prev_stamp_ns) * 1e-9
+            d_theta = current_theta - self.theta
+            d_theta = math.atan2(math.sin(d_theta), math.cos(d_theta))
+            self.x_dot = (current_x - self.x) / dt
+            self.y_dot = (current_y - self.y) / dt
+            self.theta_dot = d_theta / dt
+        elif self.prev_stamp_ns is not None and stamp_ns < self.prev_stamp_ns:
+            # Time jumped backwards (e.g. sim reset): drop the velocity estimate
+            self.x_dot = self.y_dot = self.theta_dot = 0.0
+
+        if self.prev_stamp_ns is None or stamp_ns != self.prev_stamp_ns:
+            self.x, self.y, self.theta = current_x, current_y, current_theta
+            self.prev_stamp_ns = stamp_ns
 
         if self.goal_pose is not None:
             v_f, omega_f = self.PDController(current_pose, self.goal_pose)
@@ -122,47 +153,40 @@ class DiffDrivePID(Node):
         x_g = goal_pose.pose.position.x
         y_g = goal_pose.pose.position.y
 
-        # Distance error to target
-        distance_to_goal = math.hypot(x_g - x_r, y_g - y_r)
-        if distance_to_goal < self.goal_tolerance:
-            self.get_logger().info('Goal reached! Holding position.')
-            self.goal_pose = None
-            self.prev_x = None
-            self.prev_y = None
-            return 0.0, 0.0
-
         # Look-ahead point
         x_p = x_r + self.l * np.cos(theta_r)
         y_p = y_r + self.l * np.sin(theta_r)
 
-        if self.prev_x is None or self.prev_y is None:
-            self.prev_x = x_p
-            self.prev_y = y_p
-            x_p_dot = 0.0
-            y_p_dot = 0.0
-        else:
-            x_p_dot = (x_p - self.prev_x) / self.dt
-            y_p_dot = (y_p - self.prev_y) / self.dt
-            self.prev_x = x_p
-            self.prev_y = y_p
+        # Error is measured at the look-ahead point (the point being controlled)
+        e_x = x_g - x_p
+        e_y = y_g - y_p
+        if math.hypot(e_x, e_y) < self.goal_tolerance:
+            self.get_logger().info(
+                f'Goal reached! Robot at ({x_r:.2f}, {y_r:.2f}, '
+                f'{math.degrees(theta_r):.0f} deg), point p at ({x_p:.2f}, {y_p:.2f}). '
+                'Holding position.')
+            self.goal_pose = None
+            return 0.0, 0.0
+
+        # Look-ahead point velocity, from the estimated robot velocity
+        x_p_dot = self.x_dot - self.l * self.theta_dot * np.sin(theta_r)
+        y_p_dot = self.y_dot + self.l * self.theta_dot * np.cos(theta_r)
 
         # Feedback-linearized control law
-        u_x = -self.Kp * (x_p - x_g) - self.Kd * x_p_dot
-        u_y = -self.Kp * (y_p - y_g) - self.Kd * y_p_dot
+        u_x = self.Kp * e_x - self.Kd * x_p_dot
+        u_y = self.Kp * e_y - self.Kd * y_p_dot
 
         v_f = np.cos(theta_r) * u_x + np.sin(theta_r) * u_y
         omega_f = (-np.sin(theta_r) / self.l) * u_x + (np.cos(theta_r) / self.l) * u_y
 
         # Safety clamps on velocities
-        v_f = max(min(v_f, 0.6), -0.6)
-        omega_f = max(min(omega_f, 1.2), -1.2)
+        v_f = max(min(v_f, self.v_max), -self.v_max)
+        omega_f = max(min(omega_f, self.w_max), -self.w_max)
 
         return v_f, omega_f
 
     def goal_pose_callback(self, msg):
-        """Store a newly selected RViz goal pose and reset derivative history."""
-        self.prev_x = None
-        self.prev_y = None
+        """Store a newly selected RViz goal pose."""
         self.goal_pose = msg
         self.get_logger().info(
             f'New goal set: X={msg.pose.position.x:.2f}, Y={msg.pose.position.y:.2f}'
