@@ -98,12 +98,15 @@
             <pose relative_to='world'>0 0 0 0 0 0</pose>
             <link name='chassis'>
                 <pose relative_to='__model__'>0.5 0 0.4 0 0 0</pose>
+                <!-- Heavier chassis for more load (traction) on the drive wheels.
+                     Was mass 1.14395 with ixx 0.095329, iyy 0.381317, izz 0.476646;
+                     inertia scaled by the same factor (x4.3708). -->
                 <inertial>
-                    <mass>1.14395</mass>
+                    <mass>5.0</mass>
                     <inertia>
-                        <ixx>0.095329</ixx><ixy>0</ixy><ixz>0</ixz>
-                        <iyy>0.381317</iyy><iyz>0</iyz>
-                        <izz>0.476646</izz>
+                        <ixx>0.416667</ixx><ixy>0</ixy><ixz>0</ixz>
+                        <iyy>1.666667</iyy><iyz>0</iyz>
+                        <izz>2.083333</izz>
                     </inertia>
                 </inertial>
                 <visual name='visual'>
@@ -166,6 +169,15 @@
                 </visual>
                 <collision name='collision'>
                     <geometry><sphere><radius>0.2</radius></sphere></geometry>
+                    <!-- Frictionless caster so it can't drag the robot sideways -->
+                    <surface>
+                        <friction>
+                            <ode>
+                                <mu>0.0</mu>
+                                <mu2>0.0</mu2>
+                            </ode>
+                        </friction>
+                    </surface>
                 </collision>
             </link>
             <joint name='left_wheel_joint' type='revolute'>
@@ -200,6 +212,11 @@
                 <right_joint>right_wheel_joint</right_joint>
                 <wheel_separation>1.2</wheel_separation>
                 <wheel_radius>0.4</wheel_radius>
+                <!-- Acceleration limits so wheel speeds ramp instead of jumping (reduces slip) -->
+                <max_linear_acceleration>1.0</max_linear_acceleration>
+                <min_linear_acceleration>-1.0</min_linear_acceleration>
+                <max_angular_acceleration>2.0</max_angular_acceleration>
+                <min_angular_acceleration>-2.0</min_angular_acceleration>
                 <odom_publish_frequency>30</odom_publish_frequency>
                 <topic>/cmd_vel</topic>
                 <odom_topic>/model/vehicle_blue/odometry</odom_topic>
